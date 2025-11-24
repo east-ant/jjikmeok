@@ -1,10 +1,16 @@
 package com.example.jjikmeok1;
 
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.RectF;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.util.Log;
 import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -16,6 +22,8 @@ import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.button.MaterialButton;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class image_analyze extends AppCompatActivity {
 
@@ -24,43 +32,59 @@ public class image_analyze extends AppCompatActivity {
     private MaterialButton btnFindRecipe;
     private MaterialButton btnAddIngredient;
 
+    // (추가 1) 결과 보여줄 텍스트뷰 (xml에 추가 필요, 없으면 Toast로만 확인)
+    private TextView tvResult;
+
+    // (추가 2) AI 탐지기 선언
+    private YOLOv5Detector detector;
+    private List<String> detectedIngredientNames = new ArrayList<>(); // 찾은 재료 이름 저장
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_image_analyze);
 
-        // View 초기화
         ivUserPhoto = findViewById(R.id.iv_user_photo);
         toolbar = findViewById(R.id.toolbar);
         btnFindRecipe = findViewById(R.id.btn_find_recipe);
         btnAddIngredient = findViewById(R.id.btn_add_ingredient);
 
-        // 툴바 설정
+        // (참고) layout xml에 TextView를 추가했다면 아래 주석 해제
+        // tvResult = findViewById(R.id.tv_result);
+
+        // (추가 3) YOLO Detector 초기화
+        try {
+            detector = new YOLOv5Detector(this);
+            Log.d("ImageAnalyze", "Detector loaded successfully");
+        } catch (IOException e) {
+            e.printStackTrace();
+            Toast.makeText(this, "AI 모델 로드 실패", Toast.LENGTH_SHORT).show();
+        }
+
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
             getSupportActionBar().setDisplayShowHomeEnabled(true);
         }
-
-        // 툴바 뒤로가기 버튼 처리
         toolbar.setNavigationOnClickListener(v -> onBackPressed());
 
-        // Intent로부터 이미지 데이터 받기
         loadImageFromIntent();
 
-        // 레시피 찾기 버튼 클릭 이벤트
+        // 레시피 찾기 버튼
         btnFindRecipe.setOnClickListener(v -> {
-            // TODO: 레시피 검색 화면으로 이동
-            Toast.makeText(this, "레시피를 검색합니다...", Toast.LENGTH_SHORT).show();
+            if (detectedIngredientNames.isEmpty()) {
+                Toast.makeText(this, "먼저 재료를 분석해주세요.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            // (추가 4) 서버로 재료 리스트 전송 로직이 들어갈 곳
+            // Retrofit을 이용해 detectedIngredientNames 리스트를 서버로 보냄
+            Toast.makeText(this, "서버로 전송할 재료: " + detectedIngredientNames.toString(), Toast.LENGTH_LONG).show();
         });
 
-        // 재료 추가하기 버튼 클릭 이벤트
         btnAddIngredient.setOnClickListener(v -> {
-            // TODO: 재료 추가 다이얼로그 표시
             Toast.makeText(this, "재료 추가 기능", Toast.LENGTH_SHORT).show();
         });
 
-        // EdgeToEdge Insets 설정
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.image_analyze), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
@@ -68,49 +92,78 @@ public class image_analyze extends AppCompatActivity {
         });
     }
 
-    // Intent로부터 이미지 로드
     private void loadImageFromIntent() {
-        // 카메라에서 온 경우
         boolean fromCamera = getIntent().getBooleanExtra("fromCamera", false);
-
         if (fromCamera) {
-            // 카메라로 촬영한 경우 (현재는 썸네일만 전달됨)
-            Toast.makeText(this, "카메라로 촬영한 이미지", Toast.LENGTH_SHORT).show();
-            // 실제 앱에서는 파일 경로를 전달받아 처리해야 합니다
+            // 카메라 데이터 처리 (썸네일 or 파일 로드)
+            Bundle extras = getIntent().getExtras();
+            if(extras != null) {
+                Bitmap bitmap = (Bitmap) extras.get("data"); // 썸네일
+                ivUserPhoto.setImageBitmap(bitmap);
+                if (bitmap != null) analyzeImage(bitmap);
+            }
         } else {
-            // 갤러리에서 선택한 경우
             String imageUriString = getIntent().getStringExtra("imageUri");
             if (imageUriString != null) {
                 Uri imageUri = Uri.parse(imageUriString);
                 try {
-                    Bitmap bitmap = MediaStore.Images.Media.getBitmap(
-                            getContentResolver(), imageUri
-                    );
+                    Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), imageUri);
                     ivUserPhoto.setImageBitmap(bitmap);
 
-                    // TODO: 여기서 AI 이미지 분석 시작
+                    // 이미지가 로드되면 바로 분석 시작
                     analyzeImage(bitmap);
 
                 } catch (IOException e) {
                     e.printStackTrace();
-                    Toast.makeText(this, "이미지를 불러올 수 없습니다",
-                            Toast.LENGTH_SHORT).show();
                 }
             }
         }
     }
 
-    // AI 이미지 분석 (추후 구현)
+    // (핵심) AI 분석 함수 구현
     private void analyzeImage(Bitmap bitmap) {
-        // TODO: 여기에 AI 이미지 분석 로직 추가
-        // 1. 이미지를 서버로 전송하거나
-        // 2. 온디바이스 ML 모델로 분석
-        // 3. 인식된 재료 목록을 UI에 표시
+        if (detector == null) return;
 
-        Toast.makeText(this, "이미지 분석 중...", Toast.LENGTH_SHORT).show();
+        // 1. YOLO 실행 (인식된 객체 리스트 반환)
+        List<YOLOv5Detector.Recognition> results = detector.detectObjects(bitmap);
 
-        // 분석 완료 후 재료 목록 업데이트
-        // updateIngredientList(recognizedIngredients);
+        // 2. 결과 처리
+        Bitmap mutableBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true);
+        Canvas canvas = new Canvas(mutableBitmap);
+        Paint paint = new Paint();
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(5);
+        paint.setColor(Color.RED);
+        paint.setTextSize(40);
+
+        detectedIngredientNames.clear(); // 기존 목록 초기화
+
+        for (YOLOv5Detector.Recognition res : results) {
+            // 박스 그리기
+            canvas.drawRect(res.getLocation(), paint);
+
+            // 텍스트 그리기 (이름 + 확률)
+            canvas.drawText(res.getTitle() + " " + String.format("%.1f%%", res.getConfidence() * 100),
+                    res.getLocation().left, res.getLocation().top, paint);
+
+            // 재료 이름 목록에 추가
+            detectedIngredientNames.add(res.getTitle());
+        }
+
+        // 3. 화면 업데이트
+        ivUserPhoto.setImageBitmap(mutableBitmap); // 박스 그려진 이미지로 교체
+
+        String resultText = "발견된 재료: " + detectedIngredientNames.toString();
+        Toast.makeText(this, resultText, Toast.LENGTH_LONG).show();
+
+        // 만약 TextView가 있다면:
+        // tvResult.setText(resultText);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (detector != null) detector.close(); // 메모리 해제
     }
 
     @Override
