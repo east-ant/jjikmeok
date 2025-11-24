@@ -1,5 +1,6 @@
 package com.example.jjikmeok1;
 
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -70,15 +71,22 @@ public class image_analyze extends AppCompatActivity {
 
         loadImageFromIntent();
 
-        // 레시피 찾기 버튼
+
+        // 레시피 찾기 버튼 클릭 이벤트
         btnFindRecipe.setOnClickListener(v -> {
-            if (detectedIngredientNames.isEmpty()) {
-                Toast.makeText(this, "먼저 재료를 분석해주세요.", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            // (추가 4) 서버로 재료 리스트 전송 로직이 들어갈 곳
-            // Retrofit을 이용해 detectedIngredientNames 리스트를 서버로 보냄
-            Toast.makeText(this, "서버로 전송할 재료: " + detectedIngredientNames.toString(), Toast.LENGTH_LONG).show();
+            // 인식된 재료 리스트 (YOLO에서 받은 결과)
+            ArrayList<String> ingredients = new ArrayList<>();
+
+            // TODO: 실제로는 YOLO 인식 결과에서 재료 가져오기
+            // 지금은 하드코딩된 예시
+            ingredients.add("토마토");
+            ingredients.add("양파");
+            ingredients.add("마늘");
+
+            // RecipeListActivity로 이동
+            Intent intent = new Intent(image_analyze.this, RecipeListActivity.class);
+            intent.putStringArrayListExtra("ingredients", ingredients);
+            startActivity(intent);
         });
 
         btnAddIngredient.setOnClickListener(v -> {

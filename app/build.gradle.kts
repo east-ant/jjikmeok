@@ -46,6 +46,16 @@ dependencies {
     // 이미지 처리
     implementation("org.tensorflow:tensorflow-lite-task-vision:0.4.4")
 
+    // ✅ Jsoup - HTML 파싱 (크롤링용)
+    implementation("org.jsoup:jsoup:1.17.2")
+
+    // ✅ Glide - 이미지 로딩
+    implementation("com.github.bumptech.glide:glide:4.16.0")
+    annotationProcessor("com.github.bumptech.glide:compiler:4.16.0")
+
+    // ✅ RecyclerView
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
+
     // 기존 dependencies
     implementation(libs.appcompat)
     implementation(libs.material)
